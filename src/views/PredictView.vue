@@ -10,6 +10,13 @@
       开始预测
     </el-button>
 
+    <!-- 只在进度 0–100 之间显示 -->
+<el-progress
+  v-if="progress > 0 && progress < 100"
+  :percentage="progress"
+  style="margin: 10px 0;"
+/>
+
     <el-tabs v-model="activeTab" @tab-click="onTabClick" style="margin-top: 20px;">
       <el-tab-pane label="Top 100 高概率基因" name="top">
         <el-table :data="topTableData" border style="width: 100%; margin-top: 20px;">
@@ -35,7 +42,8 @@ export default {
       tableData: [],
       topTableData: [],
       activeTab: 'top',
-      chart: null
+      chart: null,
+      progress: 0,
     };
   },
   methods: {
@@ -43,18 +51,35 @@ export default {
       this.file = file.raw;
     },
     submitFile() {
-      fetch('http://127.0.0.1:5000/api/predict')
-        .then(res => res.json())
-        .then(data => {
-          this.tableData = data;
-          this.topTableData = [...data]
-            .sort((a, b) => b.probability - a.probability)
-            .slice(0, 100);
-        })
-        .catch(err => {
-          console.error('预测失败', err);
-        });
-    },
+      this.progress = 0;
+    const source = new EventSource('http://127.0.0.1:5000/api/predict_stream');
+    // 监听进度
+    source.addEventListener('progress', e => {
+      this.progress = parseInt(e.data, 10);
+    });
+    // 监听完成，解析数据
+    source.addEventListener('done', e => {
+      let data;
+      try {
+        data = JSON.parse(e.data);
+      } catch (err) {
+        console.error('解析预测结果失败', err, e.data);
+        source.close();
+        return;
+      }
+      this.tableData = data;
+      this.topTableData = [...data]
+        .sort((a, b) => b.probability - a.probability)
+        .slice(0, 100);
+      this.progress = 100;
+      source.close();
+    });
+    // 监听错误
+    source.addEventListener('error', () => {
+      console.error('预测失败');
+      source.close();
+    });
+  },
     drawChart() {
       if (this.chart) {
         this.chart.dispose();
