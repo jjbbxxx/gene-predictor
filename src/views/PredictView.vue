@@ -2,12 +2,12 @@
   <div class="container">
     <h2>癌症基因预测系统</h2>
 
-    <el-upload class="upload-box" action="#" :auto-upload="false" :on-change="handleFileChange">
+    <el-upload class="upload-box" :auto-upload="false" :on-change="handleFileChange">
       <el-button type="primary">选择文件</el-button>
     </el-upload>
 
     <el-button type="success" @click="submitFile" style="margin-top: 10px">
-      模拟预测
+      开始预测
     </el-button>
 
     <el-tabs v-model="activeTab" @tab-click="onTabClick" style="margin-top: 20px;">
@@ -43,19 +43,16 @@ export default {
       this.file = file.raw;
     },
     submitFile() {
-      fetch('http://127.0.0.1:5000/api/predict_test')
+      fetch('http://127.0.0.1:5000/api/predict')
         .then(res => res.json())
         .then(data => {
           this.tableData = data;
           this.topTableData = [...data]
             .sort((a, b) => b.probability - a.probability)
             .slice(0, 100);
-          this.$nextTick(() => {
-            this.drawChart();
-          });
         })
         .catch(err => {
-          console.error('请求失败', err);
+          console.error('预测失败', err);
         });
     },
     drawChart() {
