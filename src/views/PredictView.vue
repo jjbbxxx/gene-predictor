@@ -5,7 +5,7 @@
         <el-button type="text" @click="handleLogout">退出</el-button>
       </div>
 
-      <h2>癌症基因预测系统</h2>
+      <h2>癌症基因识别系统</h2>
 
       <!-- 文件上传 -->
       <el-upload class="upload-box" :auto-upload="false" :on-change="handleFileChange">
@@ -19,14 +19,24 @@
       <!-- 表格 / 图表 切换 -->
       <el-tabs v-model="activeTab" @tab-click="onTabClick" style="margin-top: 20px;">
         <el-tab-pane label="Top 100 高概率基因" name="top">
+          <el-button
+      v-if="topTableData.length"
+      type="success"
+      @click="downloadCSV"
+      style="margin-top: 10px;"
+    >
+      下载原始预测结果 (CSV)
+    </el-button>
           <el-table class="top-table" :data="topTableData" border style="width: 100%; margin-top: 20px;">
             <el-table-column prop="gene_index" label="Gene Index" sortable />
             <el-table-column prop="probability" label="Probability" sortable />
           </el-table>
         </el-tab-pane>
         <el-tab-pane label="图表视图" name="chart">
-          <div ref="chartContainer" class="chart-box"></div>
+          <div ref="chartContainer" class="chart-box"></div>        
+          <el-button type="success" @click="downloadChart" style="margin-top: 10px;">下载图表</el-button>
         </el-tab-pane>
+
       </el-tabs>
     </div>
 
@@ -139,6 +149,40 @@ export default {
       })
     },
 
+
+    downloadChart() {
+    if (!this.chart) {
+      this.$message.error('图表未生成')
+      return
+    }
+    const imgUrl = this.chart.getDataURL({
+      pixelRatio: 2,  // 图片清晰度
+      backgroundColor: '#fff'
+    })
+
+    // 创建一个临时链接下载图表
+    const link = document.createElement('a')
+    link.href = imgUrl
+    link.download = '预测图表.png'
+    link.click()
+  },
+    
+  downloadCSV() {
+      axios.get('/api/download_csv', { responseType: 'blob' })
+        .then(response => {
+          // 创建一个临时链接并点击下载
+          const url = URL.createObjectURL(response.data)
+          const link = document.createElement('a')
+          link.href = url
+          link.setAttribute('download', 'predictions.csv')
+          link.click()
+          URL.revokeObjectURL(url)  // 清理临时链接
+        })
+        .catch(() => {
+          this.$message.error('下载失败')
+        })
+    },
+
     onTabClick(tab) {
       if (tab.name === 'chart' && this.topTableData.length) {
         this.$nextTick(() => this.drawChart())
@@ -164,9 +208,8 @@ export default {
 .container {
   padding: 30px;
 }
-.upload-box {}
+/* Removed empty ruleset */
 .auth-actions { text-align: center; margin-top: 50px; }
-.header-actions {}
 .chart-box {
   width: 100%;
   height: 600px;
