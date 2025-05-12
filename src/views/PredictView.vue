@@ -1,10 +1,14 @@
 <template>
   <div class="container">
-    <div v-if="isLoggedIn">
-      <div class="header-actions" style="text-align: right; margin-bottom: 10px;">
-        <el-button type="text" @click="handleLogout">退出</el-button>
-      </div>
+    <!-- 右上角欢迎栏 -->
+    <div class="top-bar">
+      <span>欢迎您，{{ username }}&nbsp;</span>
+      <el-link type="primary" @click="goProfile">个人中心</el-link>
+      <span>｜</span>
+      <el-link type="primary" @click="handleLogout">退出登录</el-link>
+    </div>
 
+    <div v-if="isLoggedIn">
       <h2>癌症基因识别系统</h2>
 
       <!-- 文件上传 -->
@@ -19,28 +23,21 @@
       <!-- 表格 / 图表 切换 -->
       <el-tabs v-model="activeTab" @tab-click="onTabClick" style="margin-top: 20px;">
         <el-tab-pane label="Top 100 高概率基因" name="top">
-          <el-button
-      v-if="topTableData.length"
-      type="success"
-      @click="downloadCSV"
-      style="margin-top: 10px;"
-    >
-      下载原始预测结果 (CSV)
-    </el-button>
+          <el-button v-if="topTableData.length" type="success" @click="downloadCSV" style="margin-top: 10px;">
+            下载原始预测结果 (CSV)
+          </el-button>
           <el-table class="top-table" :data="topTableData" border style="width: 100%; margin-top: 20px;">
             <el-table-column prop="gene_index" label="Gene Index" sortable />
             <el-table-column prop="probability" label="Probability" sortable />
           </el-table>
         </el-tab-pane>
         <el-tab-pane label="图表视图" name="chart">
-          <div ref="chartContainer" class="chart-box"></div>        
+          <div ref="chartContainer" class="chart-box"></div>
           <el-button type="success" @click="downloadChart" style="margin-top: 10px;">下载图表</el-button>
         </el-tab-pane>
-
       </el-tabs>
     </div>
 
-    <!-- 未登录时提示 -->
     <div v-else>
       <h3>请登录后进行操作</h3>
     </div>
@@ -58,6 +55,8 @@ export default {
   data() {
     return {
       isLoggedIn: false,
+      isAdmin: false,
+      username: '',
       topTableData: [],
       activeTab: 'top',
       chart: null,
@@ -73,6 +72,8 @@ export default {
       axios.get('/api/check_auth')
         .then(res => {
           this.isLoggedIn = res.data.logged_in
+          this.isAdmin = res.data.is_admin
+          this.username = res.data.username || ''
         })
         .catch(() => {
           this.isLoggedIn = false
@@ -149,25 +150,24 @@ export default {
       })
     },
 
-
     downloadChart() {
-    if (!this.chart) {
-      this.$message.error('图表未生成')
-      return
-    }
-    const imgUrl = this.chart.getDataURL({
-      pixelRatio: 2,  // 图片清晰度
-      backgroundColor: '#fff'
-    })
+      if (!this.chart) {
+        this.$message.error('图表未生成')
+        return
+      }
+      const imgUrl = this.chart.getDataURL({
+        pixelRatio: 2,  // 图片清晰度
+        backgroundColor: '#fff'
+      })
 
-    // 创建一个临时链接下载图表
-    const link = document.createElement('a')
-    link.href = imgUrl
-    link.download = '预测图表.png'
-    link.click()
-  },
-    
-  downloadCSV() {
+      // 创建一个临时链接下载图表
+      const link = document.createElement('a')
+      link.href = imgUrl
+      link.download = '预测图表.png'
+      link.click()
+    },
+
+    downloadCSV() {
       axios.get('/api/download_csv', { responseType: 'blob' })
         .then(response => {
           // 创建一个临时链接并点击下载
@@ -188,11 +188,14 @@ export default {
         this.$nextTick(() => this.drawChart())
       }
     },
-
+    goProfile() {
+      this.$router.push({ name: 'Profile' })
+    },
     handleLogout() {
       // 调用 API 清除会话
       axios.post('/api/logout')
         .then(() => {
+          this.isLoggedIn = false
           // 更新登录状态，跳转到登录页
           this.$router.push({ name: 'Login' })  // 使用 vue-router 进行页面跳转
         })
@@ -208,8 +211,14 @@ export default {
 .container {
   padding: 30px;
 }
-/* Removed empty ruleset */
-.auth-actions { text-align: center; margin-top: 50px; }
+
+/* 右上角欢迎栏 */
+.top-bar {
+  text-align: right;
+  padding: 10px 30px;
+  background-color: #f5f7fa;
+}
+
 .chart-box {
   width: 100%;
   height: 600px;
