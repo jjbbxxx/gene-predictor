@@ -29,6 +29,11 @@
           <el-table class="top-table" :data="topTableData" border style="width: 100%; margin-top: 20px;">
             <el-table-column prop="gene_index" label="Gene Index" sortable />
             <el-table-column prop="probability" label="Probability" sortable />
+            <el-table-column label="操作" width="120">
+              <template #default="scope">
+                <el-button size="mini" @click="openAnnoModal(scope.row)">批注</el-button>
+              </template>
+            </el-table-column>
           </el-table>
         </el-tab-pane>
         <el-tab-pane label="图表视图" name="chart">
@@ -42,6 +47,19 @@
       <h3>请登录后进行操作</h3>
     </div>
   </div>
+  <el-dialog title="基因批注" v-model="annoModalVisible">
+  <div>Gene Index: {{ currentAnnoRow?.gene_index }}</div>
+  <el-input
+    type="textarea"
+    v-model="annoComment"
+    placeholder="请输入批注内容"
+    rows="4"
+  />
+  <template #footer>
+    <el-button @click="annoModalVisible = false">取消</el-button>
+    <el-button type="primary" @click="saveAnnotation">保存</el-button>
+  </template>
+</el-dialog>
 </template>
 
 <script>
@@ -61,7 +79,10 @@ export default {
       activeTab: 'top',
       chart: null,
       progress: 0,
-      file: null
+      file: null,
+      annoModalVisible: false,
+      currentAnnoRow: null,
+      annoComment: ''
     }
   },
   created() {
@@ -109,12 +130,24 @@ export default {
         if (this.activeTab === 'chart') {
           this.$nextTick(() => this.drawChart())
         }
+        (async () => {
+          try {
+            const res = await axios.get('/api/predictions')
+            if (Array.isArray(res.data) && res.data.length > 0) {
+              // 假设 predictions 接口按 timestamp 倒序返回
+              this.currentPredId = res.data[0].id
+            }
+          } catch {
+            this.$message.error('获取预测 ID 失败，无法批注')
+          }
+        })()
       })
 
       source.addEventListener('error', () => {
         this.$message.error('预测失败')
         source.close()
       })
+
     },
 
     drawChart() {
@@ -147,6 +180,13 @@ export default {
         xAxis: { type: 'value', name: 'Gene Index' },
         yAxis: { type: 'value', name: 'Probability', min: 0.99, max: 1 },
         series: [{ name: 'Gene', type: 'scatter', symbolSize: 8, data: top20 }]
+      })
+      this.chart.on('click', params => {
+        if (params.seriesType === 'scatter') {
+          const geneIndex = params.data[0]
+          // 同表格，打开批注框
+          this.openAnnoModal({ gene_index: geneIndex })
+        }
       })
     },
 
@@ -202,6 +242,28 @@ export default {
         .catch(() => {
           this.$message.error('退出失败')
         })
+
+    },
+    openAnnoModal(row) {
+      this.currentAnnoRow = row
+      // 先拉取已有批注（可选）
+      axios.get(`/api/predictions/${this.currentPredId}/annotations`)
+        .then(res => {
+          const a = res.data.find(x => x.gene_index === row.gene_index)
+          this.annoComment = a ? a.comment : ''
+          this.annoModalVisible = true
+        })
+    },
+    saveAnnotation() {
+      axios.post(`/api/predictions/${this.currentPredId}/annotations`, {
+        gene_index: this.currentAnnoRow.gene_index,
+        comment: this.annoComment
+      }).then(() => {
+        this.$message.success('批注已保存')
+        this.annoModalVisible = false
+      }).catch(err => {
+        this.$message.error(err.response?.data?.error || '保存失败')
+      })
     }
   }
 }
@@ -225,3 +287,4 @@ export default {
   margin: 20px auto;
 }
 </style>
+

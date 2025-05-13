@@ -27,12 +27,20 @@
                         <el-table-column prop="id" label="记录 ID" width="100" />
                         <el-table-column prop="username" label="用户名" /> <!-- 显示用户名 -->
                         <el-table-column prop="timestamp" label="预测时间" />
+                        <el-table-column label="批注" width="100">
+                            <template #default="scope">
+                                <el-button type="text" size="small"
+                                    @click="viewAnnotations(scope.row.id)">查看</el-button>
+                            </template>
+                        </el-table-column>
+
                         <el-table-column label="下载 CSV">
                             <template #default="scope">
                                 <el-button type="primary" size="small"
                                     @click="downloadPrediction(scope.row.id)">下载</el-button>
                             </template>
                         </el-table-column>
+
                     </el-table>
 
                 </div>
@@ -69,6 +77,17 @@
             </el-main>
         </el-container>
     </el-container>
+    <el-dialog title="历史批注" v-model="annoHistoryModal" width="500px">
+        <el-table :data="annoHistory" border>
+            <el-table-column prop="gene_index" label="Gene Index" width="100" />
+            <el-table-column prop="comment" label="批注内容" />
+            <el-table-column prop="timestamp" label="时间" width="180" />
+        </el-table>
+        <template #footer>
+            <el-button @click="annoHistoryModal = false">关闭</el-button>
+        </template>
+    </el-dialog>
+
 </template>
 
 <script>
@@ -89,7 +108,9 @@ export default {
             pwdForm: {
                 old_password: '',
                 new_password: ''
-            }
+            },
+            annoHistoryModal: false,
+            annoHistory: [],
         }
     },
     created() {
@@ -185,6 +206,16 @@ export default {
                 })
                 .catch(() => {
                     this.$message.error('退出失败')
+                })
+        },
+        viewAnnotations(pid) {
+            axios.get(`/api/predictions/${pid}/annotations`)
+                .then(res => {
+                    this.annoHistory = res.data
+                    this.annoHistoryModal = true
+                })
+                .catch(() => {
+                    this.$message.error('加载批注失败')
                 })
         }
     }
